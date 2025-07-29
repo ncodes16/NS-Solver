@@ -1,5 +1,5 @@
 # EQs in SF form: dω/dt + dψ/dy * d/dx (ω) - dψ/dx * d/dy(ψ) = nu * ω^2
-
+from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 #defining parameters
@@ -18,10 +18,10 @@ kk = np.fft.fftfreq(N, Lxy/N)
 kx = kk.reshape((N, 1))
 ky = kk.reshape((1, N))
 k2 = kx**2 + ky**2
-k2[0, 0] = 0.001  # avoid division by zero
+k2[0, 0] = 1  # avoid division by zero
 #time stuff
 T = 1
-dt = 0.001
+dt = 0.0001
 nu = 10 #kinematic viscosity
 
 psi = np.sin(XX)*np.sin(YY) #TG vortex IC
@@ -48,21 +48,8 @@ def det_jacobian(psi_hat):
 
     # print(f"dpsi/dy: {dpsi_dy}\ndomega/dx: {domega_dx}\ndpsi/dx: {dpsi_dx}\ndomega/dy: {domega_dy}\n")
     return dpsi_dy * domega_dx - dpsi_dx * domega_dy
-# ETD-RK4 coefficients
-L = -nu * k2
-E = np.exp(L * dt)
-E2 = np.exp(L * dt / 2)
-L[L == 0] = 1e-20  # avoid division by zero
 
-# ETD-RK4 phi functions
-phi1 = (np.exp(L * dt) - 1) / L / dt
-phi2 = (np.exp(L * dt) - 1 - L * dt) / (L**2 * dt)
-phi3 = (np.exp(L * dt) - 1 - L * dt - 0.5 * (L * dt)**2) / (L**3 * dt)
 
-def nonlinear(psi_hat):
-    J = det_jacobian(psi_hat)
-    J_hat = dealias(np.fft.fft2(J))
-    return -J_hat
 
 
 # Store psi snapshots for animation
@@ -70,27 +57,41 @@ def nonlinear(psi_hat):
 psi_snapshots = []
 snapshot_steps = []
 num_steps = int(T / dt)
-for step in range(num_steps):
-    N1 = nonlinear(psi_hat)
-    a = E2 * omega_hat + phi1 * dt / 2 * N1
-    N2 = nonlinear(a / k2)
-    b = E2 * omega_hat + phi1 * dt / 2 * N2
-    N3 = nonlinear(b / k2)
-    c = E * omega_hat + phi1 * dt * N3
-    N4 = nonlinear(c / k2)
-    omega_hat = (
-        E * omega_hat
-        + dt * (phi1 * N1 + 2 * phi1 * (N2 + N3) + phi1 * N4) / 6
-    )
-    # Zero mean mode
-    omega_hat[0, 0] = 0
-    psi_hat = omega_hat / k2
-    psi_hat[0, 0] = 0
-    psi = np.fft.ifft2(psi_hat).real
+
+#ETD-RK4 method
+def nonlinear(psi_hat):
+    J = det_jacobian(psi_hat)
+    J_hat = dealias(np.fft.fft2(J))
+    return -J_hat
+
+L = np.diag(-nu * k2)
+E = np.exp(dt * L)
+E2 = np.exp(dt * L/2)
+
+def phi1(z):
+    phi = np.empty_like(z, dtype=np.complex128)
+    small = np.abs(z) < 1e-6
+    phi[small] = 1 + z[small] / 2 + z[small]**2 / 6
+    phi[~small] = (np.exp(z[~small]) - 1)/z[~small]
+    return phi
+phi_E = phi1(L * dt)
+phi_E2 = phi1(L * dt / 2)
+for step in tqdm(range(num_steps)):
+    a = E2 * omega_hat + dt * phi_E2 * nonlinear(psi_hat)
+    Na = nonlinear(a)
+    b = E2 * omega_hat + dt * phi_E2 * Na
+    Nb = nonlinear(b)
+    c = E * omega_hat + dt * phi_E * (2* Nb - nonlinear(psi_hat))
+    Nc = nonlinear(c)
+    omega_hat = E * omega_hat + dt * (phi_E * nonlinear(psi_hat) + 2*phi_E*(Na + Nb) + phi_E * Nc)/6
+    omega = np.fft.ifft2(omega_hat).real / (Lxy * Lxy)  # Rescale to match the original domain size
+    psi_hat = -omega_hat / k2
+    psi_hat[0, 0] = 0  # Enforce zero mean for
+    psi = np.fft.ifft2(psi_hat).real / (Lxy * Lxy)  # Rescale to match the original domain size
     if step % 100 == 0:
         psi_snapshots.append(psi.copy())
         snapshot_steps.append(step)
-
+   
 
 # Animation using matplotlib
 import matplotlib.animation as animation
@@ -98,11 +99,7 @@ if len(psi_snapshots) == 0:
     print("No psi snapshots were saved. Animation will not run.")
 else:
     psi_snapshots = np.array(psi_snapshots, dtype=np.float64)
-    print(type(psi_snapshots))
-    print(psi_snapshots.shape)
-    print(psi_snapshots.dtype)
-    print(type(psi_snapshots[0]))
-    print(psi_snapshots[0].shape)
+    print(psi_snapshots)
     shapes = [np.shape(s) for s in psi_snapshots]
     print(f"First 5 snapshot shapes: {shapes[:10]}")
     if not all(s == shapes[0] and len(s) == 2 for s in shapes):
@@ -126,5 +123,5 @@ else:
             ax.set_title(f'Streamfunction ψ, step {snapshot_steps[frame]}')
             return [im]
 
-        ani = animation.FuncAnimation(fig, update, frames=len(psi_snapshots_arr), interval=100, blit=False)
+        ani = animation.FuncAnimation(fig, update, frames=len(psi_snapshots_arr), interval=10, blit=False)
         plt.show()
