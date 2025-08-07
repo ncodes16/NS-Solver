@@ -7,10 +7,13 @@ def accurate_solution(N, Lxy, nu, T, dt, k):
     for i, t in enumerate(times):
         accurate_psis[i] = np.sin(k*X) * np.sin(k*Y) * np.exp(-2 * k * k * nu * t)
     return accurate_psis
+def initial_conditions(N, k):
+    psi = np.sin(k*X) * np.sin(k*Y)  # TG vortex initial condition
+    omega = 2 * k * k * np.sin(k*X) * np.sin(k*Y) # vorticity initial condition
+    return psi, omega
 N = 128
 X, Y = np.meshgrid(np.linspace(0, 2 * np.pi, N, False), np.linspace(0, 2 * np.pi, N, False))
-psi = np.sin(2*X) * np.sin(2*Y)  # TG vortex initial condition
-omega = 8 * np.sin(2*X) * np.sin(2*Y) # vorticity initial condition
+psi, omega = initial_conditions(N, 2)
 nu = 1/3000
 T = 20
 dt = 0.001
