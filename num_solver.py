@@ -73,7 +73,7 @@ class Solver:
         phi[~small] = (np.exp(z[~small]) - 1)/z[~small]
         return phi
     def run(self) -> np.ndarray:
-        L = -self.nu * self.k2
+        L = -self.nu * self.k2 #generalize
         E = np.exp(self.dt * L)
         E2 = np.exp(self.dt * L/2)
         phi_E = self.phi1(L * self.dt)

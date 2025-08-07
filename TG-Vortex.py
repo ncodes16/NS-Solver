@@ -2,20 +2,23 @@ from num_solver import Solver
 import numpy as np
 import matplotlib.pyplot as plt
 
+def accurate_solution(N, Lxy, nu, T, dt, k):
+    accurate_psis: np.ndarray = np.zeros((len(times), N, N), dtype=np.float64)
+    for i, t in enumerate(times):
+        accurate_psis[i] = np.sin(k*X) * np.sin(k*Y) * np.exp(-2 * k * k * nu * t)
+    return accurate_psis
 N = 128
 X, Y = np.meshgrid(np.linspace(0, 2 * np.pi, N, False), np.linspace(0, 2 * np.pi, N, False))
-psi = np.sin(X) * np.sin(Y)  # TG vortex initial condition
-omega = 2 * np.sin(X) * np.sin(Y) # vorticity initial condition
-nu = 1
-T = 1
+psi = np.sin(2*X) * np.sin(2*Y)  # TG vortex initial condition
+omega = 8 * np.sin(2*X) * np.sin(2*Y) # vorticity initial condition
+nu = 1/3000
+T = 20
 dt = 0.001
 TG_vortex = Solver(N, 2 * np.pi, dt, nu, T, psi, omega)
 psis = TG_vortex.run()
 
 times = np.linspace(0, T, int(T / dt), endpoint = True, dtype=np.float64)
-accurate_psis: np.ndarray = np.zeros((len(times), N, N), dtype=np.float64)
-for i, t in enumerate(times):
-    accurate_psis[i] = np.sin(X) * np.sin(Y) * np.exp(-2 * nu * t)
+accurate_psis = accurate_solution(N, 2 * np.pi, nu, T, dt, 2)
 
 errors = psis - accurate_psis
 rmse = np.sqrt(np.mean(np.square(errors), axis=(1, 2)))
@@ -35,5 +38,5 @@ plt.ylabel('RMSE')
 plt.title('Root Mean Square Error of Numerical Solution')
 plt.legend()
 plt.grid()
-TG_vortex.animate_snapshots(psis, 10)
+TG_vortex.animate_snapshots(psis, 50)
 plt.show()
