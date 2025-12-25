@@ -4,7 +4,7 @@
 ### partition 3: RM-512 [use one or more full 512GB-memory nodes]
 #SBATCH --partition=RM-shared # 
 #SBATCH --nodes=1
-#SBATCH --ntasks=8
+#SBATCH --ntasks=1
 #SBATCH --time=3:00:00
 ###SBATCH --mail-user=nchazma@gmail.com     # Destination email address
 #SBATCH --mail-type=ALL                       # Event(s) that triggers email notification
@@ -21,7 +21,7 @@ mkdir -p "$WORKDIR" && cp -r *.py "$WORKDIR" && cp shell "$WORKDIR" && cd "$WORK
 # submit with base envs from local computer
 # source activate base
 # conda activate dedalus3
-mpiexec -n $SLURM_NTASKS python3 noise_test.py
+python3 noise_test.py
 
 cd "$SUBMITDIR" && cp noise_test_$SLURM_JOB_ID "$WORKDIR"
 
