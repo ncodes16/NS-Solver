@@ -20,7 +20,7 @@ mkdir -p "$WORKDIR" && cp -r *.py "$WORKDIR" && cp shell "$WORKDIR" && cd "$WORK
 
 # submit with base envs from local computer
 source activate base
-# conda activate dedalus3
+conda activate base
 python3 noise_test.py
 
 cd "$SUBMITDIR" && cp noise_test_$SLURM_JOB_ID "$WORKDIR"
