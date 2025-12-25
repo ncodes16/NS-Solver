@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 class Solver:
-    def __init__(self, N: int | float, Lxy: float, dt: float, nu: float, T: float, psi0: np.ndarray, omega0: np.ndarray):
+    def __init__(self, N: int | float, Lxy: float, dt: float, nu: float, T: float, psi0: np.ndarray, omega0: np.ndarray | bool, forcing_amp: float = 0.0, forcing_k: int = 1):
         self.N = N
         self.Lxy = Lxy
         self.dt = dt
@@ -28,8 +28,15 @@ class Solver:
         #initial conditions
         self.psi = psi0
         self.psi_hat = np.fft.fft2(self.psi)
-        self.omega = omega0
+        self.omega = omega0 if omega0 is not False else np.fft.ifft2(self.k2 * self.psi_hat).real
         self.omega_hat = np.fft.fft2(self.omega)
+        # forcing (Kolmogorov) parameters
+        # forcing_amp: amplitude of body force in x-direction, f_x = F0 * sin(k*y_phys)
+        # forcing_k: integer number of periods across domain
+        self.forcing_amp = forcing_amp
+        self.forcing_k = forcing_k
+        self.forcey = forcing_amp * np.sin(forcing_k * (2 * np.pi / Lxy) * self.YY) #Kolmorogov ex.
+        self.forcex = np.zeros_like(self.forcey)
 
 
 # psi = np.sin(XX)*np.sin(YY) #TG vortex IC
@@ -40,20 +47,18 @@ class Solver:
         N = f_hat.shape[0]
         k_cutoff = N // 3
 
-        bool_mask = np.ones_like(f_hat, dtype=bool)
-        bool_mask[k_cutoff:-k_cutoff, :] = False
-        bool_mask[:, k_cutoff:-k_cutoff] = False
-
-        dealiased = np.copy(f_hat)
-        dealiased[~bool_mask] = 0
+        k_int = np.fft.fftfreq(N) * N
+        mask_1d = np.abs(k_int) <= k_cutoff
+        mask_2d = np.outer(mask_1d, mask_1d)
+        dealiased = f_hat * mask_2d
         return dealiased
 #J = dpsi/dy * domega/dx - dpsi/dx * domega/dy
     def det_jacobian(self, psi_hat):
         scale = 1 / (self.Lxy * self.Lxy)  # Rescale to match the original domain size
-        dpsi_dy = np.fft.ifft2(1j * self.ky * psi_hat).real * scale
-        domega_dx = np.fft.ifft2(1j * self.kx * self.k2 * psi_hat).real * scale
-        dpsi_dx = np.fft.ifft2(1j * self.kx * psi_hat).real * scale
-        domega_dy = np.fft.ifft2(1j * self.ky * self.k2 * psi_hat).real * scale
+        dpsi_dy = np.fft.ifft2(1j * self.ky * psi_hat) * scale
+        domega_dx = np.fft.ifft2(1j * self.kx * self.k2 * psi_hat) * scale
+        dpsi_dx = np.fft.ifft2(1j * self.kx * psi_hat) * scale
+        domega_dy = np.fft.ifft2(1j * self.ky * self.k2 * psi_hat) * scale
 
         # print(f"dpsi/dy: {dpsi_dy}\ndomega/dx: {domega_dx}\ndpsi/dx: {dpsi_dx}\ndomega/dy: {domega_dy}\n")
         return dpsi_dy * domega_dx - dpsi_dx * domega_dy
@@ -62,9 +67,11 @@ class Solver:
 
 #ETD-RK4 method
     def nonlinear(self, psi_hat):
-        J = self.det_jacobian(psi_hat)
-        J_hat = self.dealias(np.fft.fft2(J))
+        J = self.det_jacobian(self.dealias(psi_hat))
+        # J_hat = self.dealias(np.fft.fft2(J))
+        J_hat = np.fft.fft2(J)
         return -J_hat
+
         
     def phi1(self, z):
         phi = np.empty_like(z, dtype=np.complex128)
@@ -72,14 +79,19 @@ class Solver:
         phi[small] = 1 + z[small] / 2 + z[small]**2 / 6 + z[small]**3 / 24 + z[small]**4 / 120
         phi[~small] = (np.exp(z[~small]) - 1)/z[~small]
         return phi
-    def run(self) -> np.ndarray:
-        L = -self.nu * self.k2 #generalize
+    def run(self, debug=False) -> np.ndarray | int:
+        L = -self.nu * self.k2 + (1j / self.k2) * self.forcing_amp * (self.ky * self.forcey - self.kx * self.forcex)
         E = np.exp(self.dt * L)
         E2 = np.exp(self.dt * L/2)
         phi_E = self.phi1(L * self.dt)
         phi_E2 = self.phi1(L * self.dt / 2)
         psis = np.zeros((self.num_steps, self.N, self.N), dtype=np.float64)
+        qs = np.zeros((self.num_steps, self.N, self.N), dtype=np.float64)
+        # precompute forcing in Fourier space (vorticity forcing)
         for step in tqdm(range(self.num_steps)):
+            if debug:
+                if not (np.all(np.isfinite(self.omega_hat)) and np.all(np.isfinite(self.psi_hat))):
+                    return step
             a = E2 * self.omega_hat + self.dt * phi_E2 * self.nonlinear(self.psi_hat)
             Na = self.nonlinear(a)
             b = E2 * self.omega_hat + self.dt * phi_E2 * Na
@@ -93,7 +105,10 @@ class Solver:
             self.psi = np.fft.ifft2(self.psi_hat).real #/ (self.Lxy * self.Lxy)
             if step < self.num_steps:
                 psis[step ] = self.psi
-        return psis
+            
+            #velocity field
+            qs[step] = np.sqrt(np.fft.ifft2(1j * self.ky * self.psi_hat).real **2 + np.fft.ifft2(1j * self.kx * self.psi_hat).real **2)  # Magnitude of velocity field
+        return psis, qs
    
 
 # Animation using matplotlib
