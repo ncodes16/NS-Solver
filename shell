@@ -19,7 +19,7 @@ WORKDIR=/ocean/projects/phy240052p/chasmawa/noise_test/$SLURM_JOB_ID
 mkdir -p "$WORKDIR" && cp -r *.py "$WORKDIR" && cp shell "$WORKDIR" && cd "$WORKDIR" || exit -1
 
 # submit with base envs from local computer
-# source activate base
+source activate base
 # conda activate dedalus3
 python3 noise_test.py
 
