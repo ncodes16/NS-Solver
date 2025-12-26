@@ -31,12 +31,7 @@ for level in noise_levels:
     if result_list.mean() < 10:
         break
 results = np.pad(results, (0, len(noise_levels) - len(results)))
-fig, ax = plt.subplots(figsize = (6, 4))
-ax.plot(noise_levels, results, label='Max step reached vs noise level')
-ax.set_xlabel("Noise Level (%)")
-ax.set_ylabel("Max step reached")
-ax.legend()
-ax.grid()
-
-now = datetime.now().strftime("%Y.%m.%d._%H.%M.%S.")
-plt.savefig(f"noise_test_{now}.png")
+with open('noise_levels.npy', 'wb') as f:
+    np.save(f, np.array(noise_levels))
+with open('results.npy', 'wb') as f:
+    np.save(f, results)
