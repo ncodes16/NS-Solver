@@ -4,10 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import num_solver
-num_trials = 20
-noise_levels = [1 + 0.2 * i for i in range(50)]
+num_trials = 5
+noise_levels = [1 + 2.5 * i for i in range(5)]
 # noise_levels = [0.5, 1.0, 10.0, 100.0]
-T_max = 100
+T_max = 10
 N=64
 nu = 0.01
 dt = 0.01

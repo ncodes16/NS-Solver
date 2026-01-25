@@ -35,8 +35,9 @@ class Solver:
         # forcing_k: integer number of periods across domain
         self.forcing_amp = forcing_amp
         self.forcing_k = forcing_k
-        self.forcey = forcing_amp * np.sin(forcing_k * (2 * np.pi / Lxy) * self.YY) #Kolmorogov ex.
-        self.forcex = np.zeros_like(self.forcey)
+        self.force = forcing_amp * np.sin(forcing_k * 2 * np.pi / Lxy * self.YY)
+       
+        
 
 
 # psi = np.sin(XX)*np.sin(YY) #TG vortex IC
@@ -70,6 +71,7 @@ class Solver:
         J = self.det_jacobian(self.dealias(psi_hat))
         # J_hat = self.dealias(np.fft.fft2(J))
         J_hat = np.fft.fft2(J)
+        J_hat += 1j * self.kx * np.fft.fft2(self.force)  # add forcing in Fourier space
         return -J_hat
 
         
@@ -80,7 +82,7 @@ class Solver:
         phi[~small] = (np.exp(z[~small]) - 1)/z[~small]
         return phi
     def run(self, debug=False) -> np.ndarray | int:
-        L = -self.nu * self.k2 + (1j / self.k2) * self.forcing_amp * (self.ky * self.forcey - self.kx * self.forcex)
+        L = -self.nu * self.k2
         E = np.exp(self.dt * L)
         E2 = np.exp(self.dt * L/2)
         phi_E = self.phi1(L * self.dt)
@@ -91,6 +93,8 @@ class Solver:
         for step in tqdm(range(self.num_steps)):
             if debug:
                 if not (np.all(np.isfinite(self.omega_hat)) and np.all(np.isfinite(self.psi_hat))):
+                    return step
+                elif np.any(np.abs(self.omega_hat) > 1e5) or np.any(np.abs(self.psi_hat) > 1e5):
                     return step
             a = E2 * self.omega_hat + self.dt * phi_E2 * self.nonlinear(self.psi_hat)
             Na = self.nonlinear(a)
