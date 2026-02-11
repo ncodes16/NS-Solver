@@ -35,7 +35,7 @@ class Solver:
         # forcing_k: integer number of periods across domain
         self.forcing_amp = forcing_amp
         self.forcing_k = forcing_k
-        self.force = forcing_amp * np.sin(forcing_k * 2 * np.pi / Lxy * self.YY)
+        self.force = forcing_amp * np.sin(forcing_k * 2 * np.pi / Lxy * self.XX)
        
         
 
@@ -71,7 +71,7 @@ class Solver:
         J = self.det_jacobian(self.dealias(psi_hat))
         # J_hat = self.dealias(np.fft.fft2(J))
         J_hat = np.fft.fft2(J)
-        J_hat += 1j * self.kx * np.fft.fft2(self.force)  # add forcing in Fourier space
+        J_hat += 1j * self.ky * np.fft.fft2(self.force)  # add forcing in Fourier space
         return -J_hat
 
         
