@@ -141,9 +141,9 @@ class Solver:
         ani = animation.FuncAnimation(fig, update, frames=len(psi_snapshots), interval=100, blit=False)
         plt.show()
 
-X, Y = np.meshgrid(np.linspace(0, 2 * np.pi, 128, False), np.linspace(0, 2 * np.pi, 128, False))
-psi = np.sin(X) * np.sin(Y)  # TG vortex initial condition
-omega = 2 * psi
-TG_vortex = Solver(128, 2 * np.pi, 0.001, 10, 1, psi, omega)
+# X, Y = np.meshgrid(np.linspace(0, 2 * np.pi, 128, False), np.linspace(0, 2 * np.pi, 128, False))
+# psi = np.sin(X) * np.sin(Y)  # TG vortex initial condition
+# omega = 2 * psi
+# TG_vortex = Solver(128, 2 * np.pi, 0.001, 10, 1, psi, omega)
 # psis = TG_vortex.run()
 # TG_vortex.animate_snapshots(psis, 10)
