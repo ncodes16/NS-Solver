@@ -6,7 +6,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --time=3:00:00
-#SBATCH --mem=2G
+#SBATCH --mem=2000M
 ###SBATCH --mail-user=nchazma@gmail.com     # Destination email address
 #SBATCH --mail-type=ALL                       # Event(s) that triggers email notification
 #SBATCH --job-name=kol128
