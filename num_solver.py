@@ -113,6 +113,87 @@ class Solver:
             #velocity field
             qs[step] = np.sqrt(np.fft.ifft2(1j * self.ky * self.psi_hat).real **2 + np.fft.ifft2(1j * self.kx * self.psi_hat).real **2)  # Magnitude of velocity field
         return psis, qs
+    
+    def run_with_snapshots(self, snapshot_indices, times, accurate_solution_func, N, Lxy, nu, T, dt, k, output_dir, C_MAX=1, debug=False):
+        """
+        Memory-efficient run that saves snapshots during computation and deletes old data.
+        Only keeps current timestep in memory.
+        accurate_solution_func: function to compute accurate solution at a given step
+        """
+        import gc
+        from tqdm import tqdm
+        import matplotlib.pyplot as plt
+        
+        L = -self.nu * self.k2
+        E = np.exp(self.dt * L)
+        E2 = np.exp(self.dt * L/2)
+        phi_E = self.phi1(L * self.dt)
+        phi_E2 = self.phi1(L * self.dt / 2)
+        
+        psis = None  # Don't store all timesteps in memory
+        qs = None
+        current_psi = np.zeros((self.N, self.N), dtype=np.float64)
+        
+        snapshot_idx = 0
+        
+        for step in tqdm(range(self.num_steps)):
+            if debug:
+                if not (np.all(np.isfinite(self.omega_hat)) and np.all(np.isfinite(self.psi_hat))):
+                    return None, None
+                elif np.any(np.abs(self.omega_hat) > 1e5) or np.any(np.abs(self.psi_hat) > 1e5):
+                    return None, None
+            
+            # Compute step
+            a = E2 * self.omega_hat + self.dt * phi_E2 * self.nonlinear(self.psi_hat)
+            Na = self.nonlinear(a)
+            b = E2 * self.omega_hat + self.dt * phi_E2 * Na
+            Nb = self.nonlinear(b)
+            c = E * self.omega_hat + self.dt * phi_E * (2* Nb - self.nonlinear(self.psi_hat))
+            Nc = self.nonlinear(c)
+            self.omega_hat = E * self.omega_hat + self.dt * (phi_E * self.nonlinear(self.psi_hat) + 2*phi_E*(Na + Nb) + phi_E * Nc)/6
+            self.omega = np.fft.ifft2(self.omega_hat).real
+            self.psi_hat = self.omega_hat / self.k2
+            self.psi_hat[0, 0] = 0
+            self.psi = np.fft.ifft2(self.psi_hat).real
+            
+            current_psi = self.psi.copy()
+            
+            # Save snapshot if this is a snapshot step
+            if snapshot_idx < len(snapshot_indices) and step == snapshot_indices[snapshot_idx]:
+                label = f"{snapshot_idx * 100 // len(snapshot_indices)} %"
+                
+                # Compute accurate solution only for this step
+                accurate_psi = accurate_solution_func(N, Lxy, nu, T, dt, k, step, times)
+                
+                # Create figure with current snapshot
+                fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+                
+                # Plot numerical solution
+                im1 = ax[0].imshow(current_psi, origin='lower', cmap='viridis', 
+                                   extent=(0, self.Lxy, 0, self.Lxy), 
+                                   vmin=-C_MAX, vmax=C_MAX)
+                ax[0].set_title(f'Numerical Solution at t={times[step]:.3f}')
+                plt.colorbar(im1, ax=ax[0])
+                
+                # Plot analytical solution
+                im2 = ax[1].imshow(accurate_psi, origin='lower', cmap='viridis', 
+                                   extent=(0, self.Lxy, 0, self.Lxy), 
+                                   vmin=-C_MAX, vmax=C_MAX)
+                ax[1].set_title(f'Analytical Solution at t={times[step]:.3f}')
+                plt.colorbar(im2, ax=ax[1])
+                
+                # Save and close immediately to free memory
+                filename = f'{output_dir}/snapshot_{label}_t{times[step]:.3f}.png'
+                fig.savefig(filename, dpi=100, bbox_inches='tight')
+                plt.close(fig)
+                
+                # Explicitly delete local references and garbage collect
+                del fig, ax, im1, im2, accurate_psi
+                gc.collect()
+                
+                snapshot_idx += 1
+        
+        return None, None
    
 
 # Animation using matplotlib

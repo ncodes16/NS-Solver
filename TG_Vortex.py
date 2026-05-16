@@ -2,12 +2,13 @@ from num_solver import Solver
 import numpy as np
 import matplotlib.pyplot as plt
 
-def accurate_solution(N, Lxy, nu, T, dt, k):
-    accurate_psis: np.ndarray = np.zeros((len(times), N, N), dtype=np.float64)
-    for i, t in enumerate(times):
-        accurate_psis[i] = -(1 / nu) * (1 / k) ** 3 * np.cos(k * Y)
-        # accurate_psis[i] = np.sin(X) * np.sin(Y) * np.exp(-2 * nu * t)
-    return accurate_psis
+def accurate_solution_at_step(N, Lxy, nu, T, dt, k, step, times):
+    """Compute accurate solution at a single timestep"""
+    accurate_psi: np.ndarray = np.zeros((N, N), dtype=np.float64)
+    t = times[step]
+    accurate_psi = -(1 / nu) * (1 / k) ** 3 * np.cos(k * Y)
+    # accurate_psi = np.sin(X) * np.sin(Y) * np.exp(-2 * nu * t)
+    return accurate_psi
 def initial_conditions(N, k, noise_amp=0):
     psi = np.sin(k*X) * np.sin(k*Y)  # TG vortex initial condition
     omega = 2 * k * k * np.sin(k*X) * np.sin(k*Y) # vorticity initial condition
@@ -28,70 +29,25 @@ nu = 0.01
 T = 100
 dt = 0.0001
 TG_vortex = Solver(N, 2 * np.pi, dt, nu, T, psi, False, 1, 4)
-psis, qs = TG_vortex.run()
 
-times = np.linspace(0, T, int(T / dt), endpoint = True, dtype=np.float64)
-accurate_psis = accurate_solution(N, 2 * np.pi, nu, T, dt, 4)
-
-errors = psis - accurate_psis
-nrmse = np.sqrt(np.mean(np.square(errors), axis=(1, 2))/(np.mean(np.square(accurate_psis), axis=(1, 2))))
-
-C_MAX = 1
-fig, ax = plt.subplots(1, 2, figsize=(12, 6))
-im1 = ax[0].imshow(psis[-1], origin='lower', cmap='viridis', extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), vmin=-C_MAX, vmax=C_MAX)
-# im1 = ax[0].imshow(psis[int(len(psis)/2)], origin='lower', cmap='viridis', extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), vmin=-0.5, vmax=0.5)
-# im2 = ax[1].imshow(accurate_psis[int(len(psis)/2)], origin='lower', cmap='viridis', extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), vmin=-0.5, vmax=0.5)
-im2 = ax[1].imshow(accurate_psis[-1], origin='lower', cmap='viridis', extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), vmin=-C_MAX, vmax=C_MAX)
-ax[0].set_title('Numerical Solution at t=100')
-ax[1].set_title('Analytical Solution at t=100')
-plt.colorbar(im1, ax=ax[0])
-plt.colorbar(im2, ax=ax[1])
-# # Plot RMSE in a separate new figure (don't reuse figure 1)
-# fig2, ax2 = plt.subplots(figsize=(6, 4))
-# ax2.set_yscale('log')
-# ax2.plot(times, nrmse, label='NRMSE over time')
-# ax2.set_xlabel('Time')
-# ax2.set_ylabel('NRMSE')
-# ax2.set_title('Normalized Root Mean Square Error of Numerical Solution')
-# ax2.legend()
-# ax2.grid()
-
-# Save 101 snapshot images at different time points
 import gc
 import os
 
 output_dir = './snapshots'
 os.makedirs(output_dir, exist_ok=True)
 
-# Select 4 time indices: start, 1/3, 2/3, end
-time_indices = [i * len(psis) // 101 for i in range(101)]
-time_labels = [f"{i} %" for i in range(101)]
-for idx, label in zip(time_indices, time_labels):
-    # Create figure with current snapshot
-    fig, ax = plt.subplots(1, 2, figsize=(12, 6))
-    
-    # Plot numerical solution
-    im1 = ax[0].imshow(psis[idx], origin='lower', cmap='viridis', 
-                       extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), 
-                       vmin=-C_MAX, vmax=C_MAX)
-    ax[0].set_title(f'Numerical Solution at t={times[idx]:.3f}')
-    plt.colorbar(im1, ax=ax[0])
-    
-    # Plot analytical solution
-    im2 = ax[1].imshow(accurate_psis[idx], origin='lower', cmap='viridis', 
-                       extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), 
-                       vmin=-C_MAX, vmax=C_MAX)
-    ax[1].set_title(f'Analytical Solution at t={times[idx]:.3f}')
-    plt.colorbar(im2, ax=ax[1])
-    
-    # Save and close immediately to free memory
-    filename = os.path.join(output_dir, f'snapshot_{label}_t{times[idx]:.3f}.png')
-    fig.savefig(filename, dpi=100, bbox_inches='tight')
-    plt.close(fig)
-    
-    # Explicitly delete local references and garbage collect
-    del fig, ax, im1, im2
-    gc.collect()
+# Run solver with memory-efficient snapshot saving
+num_steps = int(T / dt)
+num_snapshots = 100
+snapshot_indices = [i * num_steps // num_snapshots for i in range(num_snapshots)]
+snapshot_labels = [f"{i} %" for i in range(num_snapshots)]
+
+times = np.linspace(0, T, num_steps, endpoint=True, dtype=np.float64)
+
+# Run solver - accurate solution computed on-the-fly for each snapshot
+psis_final, qs_final = TG_vortex.run_with_snapshots(snapshot_indices, times, 
+                                                      accurate_solution_at_step, N, 2*np.pi, nu, T, dt, 4,
+                                                      output_dir, C_MAX=1)
 
 print(f"Snapshots saved to {output_dir}/")
 
