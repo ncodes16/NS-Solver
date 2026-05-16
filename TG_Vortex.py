@@ -25,7 +25,7 @@ psi, omega = initial_conditions(N, 2, 0.0)
 # psi = np.random.normal(size=(N, N), loc = 0, scale=0.05)
 # psi = np.sin(4* Y)
 nu = 0.01
-T = 10
+T = 100
 dt = 0.0001
 TG_vortex = Solver(N, 2 * np.pi, dt, nu, T, psi, False, 1, 4)
 psis, qs = TG_vortex.run()
@@ -36,16 +36,16 @@ accurate_psis = accurate_solution(N, 2 * np.pi, nu, T, dt, 4)
 errors = psis - accurate_psis
 nrmse = np.sqrt(np.mean(np.square(errors), axis=(1, 2))/(np.mean(np.square(accurate_psis), axis=(1, 2))))
 
-# C_MAX = 1
-# fig, ax = plt.subplots(1, 2, figsize=(12, 6))
-# im1 = ax[0].imshow(psis[-1], origin='lower', cmap='viridis', extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), vmin=-C_MAX, vmax=C_MAX)
-# # im1 = ax[0].imshow(psis[int(len(psis)/2)], origin='lower', cmap='viridis', extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), vmin=-0.5, vmax=0.5)
-# # im2 = ax[1].imshow(accurate_psis[int(len(psis)/2)], origin='lower', cmap='viridis', extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), vmin=-0.5, vmax=0.5)
-# im2 = ax[1].imshow(accurate_psis[-1], origin='lower', cmap='viridis', extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), vmin=-C_MAX, vmax=C_MAX)
-# ax[0].set_title('Numerical Solution at t=100')
-# ax[1].set_title('Analytical Solution at t=100')
-# plt.colorbar(im1, ax=ax[0])
-# plt.colorbar(im2, ax=ax[1])
+C_MAX = 1
+fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+im1 = ax[0].imshow(psis[-1], origin='lower', cmap='viridis', extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), vmin=-C_MAX, vmax=C_MAX)
+# im1 = ax[0].imshow(psis[int(len(psis)/2)], origin='lower', cmap='viridis', extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), vmin=-0.5, vmax=0.5)
+# im2 = ax[1].imshow(accurate_psis[int(len(psis)/2)], origin='lower', cmap='viridis', extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), vmin=-0.5, vmax=0.5)
+im2 = ax[1].imshow(accurate_psis[-1], origin='lower', cmap='viridis', extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), vmin=-C_MAX, vmax=C_MAX)
+ax[0].set_title('Numerical Solution at t=100')
+ax[1].set_title('Analytical Solution at t=100')
+plt.colorbar(im1, ax=ax[0])
+plt.colorbar(im2, ax=ax[1])
 # # Plot RMSE in a separate new figure (don't reuse figure 1)
 # fig2, ax2 = plt.subplots(figsize=(6, 4))
 # ax2.set_yscale('log')
@@ -56,5 +56,44 @@ nrmse = np.sqrt(np.mean(np.square(errors), axis=(1, 2))/(np.mean(np.square(accur
 # ax2.legend()
 # ax2.grid()
 
-TG_vortex.animate_snapshots(psis, 50)
+# Save 101 snapshot images at different time points
+import gc
+import os
+
+output_dir = './snapshots'
+os.makedirs(output_dir, exist_ok=True)
+
+# Select 4 time indices: start, 1/3, 2/3, end
+time_indices = [i * len(psis) // 101 for i in range(101)]
+time_labels = [f"{i} %" for i in range(101)]
+for idx, label in zip(time_indices, time_labels):
+    # Create figure with current snapshot
+    fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+    
+    # Plot numerical solution
+    im1 = ax[0].imshow(psis[idx], origin='lower', cmap='viridis', 
+                       extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), 
+                       vmin=-C_MAX, vmax=C_MAX)
+    ax[0].set_title(f'Numerical Solution at t={times[idx]:.3f}')
+    plt.colorbar(im1, ax=ax[0])
+    
+    # Plot analytical solution
+    im2 = ax[1].imshow(accurate_psis[idx], origin='lower', cmap='viridis', 
+                       extent=(0, TG_vortex.Lxy, 0, TG_vortex.Lxy), 
+                       vmin=-C_MAX, vmax=C_MAX)
+    ax[1].set_title(f'Analytical Solution at t={times[idx]:.3f}')
+    plt.colorbar(im2, ax=ax[1])
+    
+    # Save and close immediately to free memory
+    filename = os.path.join(output_dir, f'snapshot_{label}_t{times[idx]:.3f}.png')
+    fig.savefig(filename, dpi=100, bbox_inches='tight')
+    plt.close(fig)
+    
+    # Explicitly delete local references and garbage collect
+    del fig, ax, im1, im2
+    gc.collect()
+
+print(f"Snapshots saved to {output_dir}/")
+
+# TG_vortex.animate_snapshots(psis, 50)
 plt.show()
