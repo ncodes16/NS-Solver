@@ -8,20 +8,20 @@
 #SBATCH --time=3:00:00
 ###SBATCH --mail-user=nchazma@gmail.com     # Destination email address
 #SBATCH --mail-type=ALL                       # Event(s) that triggers email notification
-#SBATCH --job-name=noise_test
-#SBATCH --output=noise_test_%j
+#SBATCH --job-name=kol128
+#SBATCH --output=kol128_%j
 export SLURM_EXPORT_ENV=ALL
 #export I_MPI_FABRICS=shm,tcp
 
 ##the slurm number to restart simulation... This need full state to be stored.
 SUBMITDIR=$SLURM_SUBMIT_DIR
-WORKDIR=/ocean/projects/phy240052p/chasmawa/noise_test/$SLURM_JOB_ID
+WORKDIR=/ocean/projects/phy240052p/chasmawa/kol128/$SLURM_JOB_ID
 mkdir -p "$WORKDIR" && cp -r *.py "$WORKDIR" && cp shell "$WORKDIR" && cd "$WORKDIR" || exit -1
 
 # submit with base envs from local computer
 source activate base
 conda activate dapper-env
-python3 noise_test.py
+python3 TG_Vortex.py
 
-cd "$SUBMITDIR" && cp noise_test_$SLURM_JOB_ID "$WORKDIR"
+cd "$SUBMITDIR" && cp 128_t100_dt10e-4_$SLURM_JOB_ID "$WORKDIR"
 
